@@ -1,0 +1,436 @@
+---
+title: "Mixed effects model"  
+author: 
+  - "Ichinomiyanishi Hospital"
+  - "Akihiro Shiroshita"
+date: '`r Sys.Date()`'
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    css: xaringan-themer.css
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE,
+                      message = FALSE,
+                      fig.align = "center",
+                      fig.asp = 0.618,
+                      fig.retina = 3,
+                      fig.width = 6,
+                      dev = "svg",
+                      out.width = "80%")
+options(htmltools.dir.version = FALSE)
+```
+
+```{r xaringan-themer, include=FALSE, warning=FALSE}
+library(xaringanthemer)
+style_duo_accent(
+  primary_color = "#1381B0",
+  secondary_color = "#FF961C",
+  inverse_header_color = "#FFFFFF"
+)
+```
+```{r xaringan-extra, include=FALSE, warning=FALSE}
+xaringanExtra::use_tile_view() # press "O" button
+xaringanExtra::use_panelset()
+xaringanExtra::use_extra_styles(
+  hover_code_line = TRUE,         #<<
+  mute_unhighlighted_code = TRUE  #<<
+)
+
+xaringanExtra::use_tachyons()
+```
+
+# General set-up  
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(clubSandwich)
+library(nlme)
+library(lme4)
+library(plm)
+library(lavaan)
+library(broom)
+library(broom.mixed)
+library(ggeffects)
+```
+
+---
+class: center, middle
+
+# Multilevel modeling     
+
+---
+# Why multilevel modelsing?  
+1. Cluster  
+2. Repeated observations  
+Key point: The difference is exchangeability.  
+
+---
+# Variance  
+Without considering covariates    
+
+$$\frac{1}{N-1}\sum^N_{i=1}(y_i-\bar{y})^2$$  
+
+# Residual variance  
+With considering covariates    
+$$\frac{1}{N-1}\sum^N_{i=1}(y_i-\hat{y_i})^2$$  
+$$\hat{y_i}=E(Y|X=x)$$  
+
+---
+# $R^2$   
+$$R^2=1-\frac{\sum(y_i-\hat{y_i})^2}{\sum(y_i-\bar{y})}$$
+
+---
+.pull-left[
+
+###1. Cluster  
+```{r echo=FALSE}
+ichinomiyanishi <- tibble(
+  hospital = "Ichinomiyanishi" ,
+  age = seq(from = 75, by = 1, length.out = 5)
+)
+
+kobe <- tibble(
+  hospital = "Kobe" ,
+  age = seq(from = 80, by = 1, length.out = 5)
+)
+
+d <- bind_rows(ichinomiyanishi, kobe)
+d <- d %>% 
+  mutate(hospital = as.factor(hospital))
+
+ggplot(d, aes(x = age, fill = hospital )) +
+  scale_y_continuous(NULL, breaks = NULL, limits = c(0,.3)) +
+  scale_x_continuous(breaks = seq(70, 90, by = 2), 
+                     limits = c(70, 90)) +
+  stat_function( fun = dnorm,
+                 color = "#1381B0",
+                 args = list(
+                   mean = mean(d$age[d$hospital=="Ichinomiyanishi"]), 
+                   sd = sd(d$age[d$hospital=="Ichinomiyanishi"])) ) +
+  stat_function( fun = dnorm, 
+                 color = "#FF961C",
+                 args = list(
+                   mean = mean(d$age[d$hospital=="Kobe"]), 
+                   sd = sd(d$age[d$hospital=="Kobe"])) ) +
+  stat_function( fun = dnorm, 
+                 color = "black",
+                 linetype = 3,
+                 args = list(
+                   mean = mean(d$age), 
+                   sd = sd(d$age)  )) +
+  geom_hline(yintercept = 0, color = "white") +
+  geom_dotplot(binwidth = .5, color = NA) +
+  scale_fill_manual(values = c("blue", "orange") ) +
+  labs( x = "Age" ,
+        fill = "Hospital",
+        title = "Clustered data") +
+  theme(legend.position = "top")
+```
+Different hospital, different patients.  ]
+
+.pull-right[
+###2. Longitudinal data 
+```{r echo=FALSE}
+akihiro <- tibble(
+  name = "Akihiro",
+  year = 1:3,
+  skills = c(10, 20, 25) )
+
+yuya <- tibble(
+  name = "Yuya",
+  year = 1:3, 
+  skills = c(10, 14, 30))
+
+d2 <- bind_rows(akihiro, yuya)
+
+ggplot( d2 , aes( x = year, y = skills, color = name )) +
+  geom_point(size = 2.5, alpha = .8) +
+  geom_line(size = 1.3, alpha = .8) + 
+  scale_y_continuous(limits = c(0, 35)) +
+  scale_x_continuous(breaks = c(1,2,3)) +
+  labs(y = "Coding skills",
+       x = "Year",
+       color = "Name",
+       title = "Longitudinal data") +
+  scale_color_manual(values = c("orange", "blue") ) +
+  theme(legend.position = "top")
+
+```
+
+
+Different people, different growth curve.  
+]  
+
+--
+
+.footnote[Distinguishing *within* and *between* variability !]
+
+---
+# Intraclass correlation  
+$$ICC = \frac{\text{Between-group variance}}{\text{Total variance}} $$  
+$$\rho = \frac{\tau^2}{\tau^2+\sigma^2} $$  
+---
+# How to pool the data
+- No pooling: Fixed effect model    
+- Partial pooling: combine cluster-specific data (Random effect model)     
+$$ \hat{\mu}_j^{PP} = \hat{R}_j(\hat{\mu}_j^{ML} - \bar{\mu}) + \bar{\mu} $$  
+$$ \hat{R}_j = \frac{\tau^2}{\tau^2 + \sigma^2 / n_j} $$  
+- Complete pooling  
+
+---
+# Summary   
+#### No pooling
+
+$y_{ij} = \mu + \alpha_{j} + \varepsilon_{ij}$
+
+$\varepsilon_{ij} \sim N(0,\sigma^2)$
+
+--
+
+#### Partial pooling
+
+$y_{ij} = \alpha_{j} + \varepsilon_{ij}$
+
+$\alpha_j \sim N(\mu,\tau^2)$
+
+$\varepsilon_{ij} \sim N(0,\sigma^2)$
+
+---
+
+#### Complete pooling
+
+$y_{ij} = \alpha_{j} + \varepsilon_{ij}$
+
+$\alpha_j \sim N(\mu,0) \qquad$ [assumes $\alpha_j$ does not vary]
+
+$\varepsilon_{ij} \sim N(0,\sigma^2)$  
+
+--
+#### Partially pooled intercepts and slopes  
+
+$y_{ij} = \beta_0 + u_{0j} +(\beta_{1} + u_{1j} ) x_{ij} + \varepsilon_{ij}$
+
+$u_{0j} \sim N(0,\tau_0^2)$
+
+$u_{1j} \sim N(0,\tau_1^2)$
+
+$\tau_{01} = \text{cov}(u_{0j},u_{1j}) \quad$   [covariance between random components]
+
+$\varepsilon_{ij} \sim N(0,\sigma^2)$
+
+---
+# Multivariate models  
+
+level 1 or level 2  or both?  
+
+#### Within or Level 1  
+$R_{(W)}^2 = \frac{\sigma_0^2-\sigma_1^2}{\sigma_0^2}$   
+#### Between or Level 2  
+$R_{(B)}^2 = \frac{\tau_0^2-\tau_1^2}{\tau_0^2}$
+#### Total  
+$R_{(T)}^2 = \frac{(\tau_0^2 +\sigma_0^2) - (\tau_1^2 +\sigma_1^2)}{\tau_0^2 +\sigma_0^2}$  
+
+---
+# Standardization  
+In general, 0-1 standardization instead of z-score standardization may be better.  
+
+---
+# Assumption  
+$y_{ij} = \mu + \beta x_{ij} + \alpha_j + \varepsilon_{ij}$
+
+These models partition the total error into group- and individual-level components. But the same assumptions apply: that $x_{ij}$ is independent of $\alpha_j$ and $\varepsilon_{ij}$.  
+It requires the assumption that the within and between variance have the *same effects* on the outcome.  
+---
+### Between-within model vs within (fixed)-effects model  
+A within-effects model discards all between-group variance.  
+It does not work well in panel data analysis.  
+If we do not care about level-2 effects, a within model is the more conservative.  
+
+---
+# Longitudinal data analysis  
+Not exchangeable  
+- Robust standard errors  
+- Generalized least squares  
+- Generalized estimating equations  
+- Random-effects models  
+- Fixed-effects models  
+---
+# Ordinal least squares   
+$y_{it} = \mu_{t} + \beta x_{it} + + \gamma z_{i} + \varepsilon_{it}$  
+$\varepsilon$ is uncorrelated with x and z.  
+---
+# Robust standard error  
+OLS has no correction for dependence  
+Nothing to do with coefficients  
+Generally increase in the standard errors for time-invariant variables  
+Standard errors for time often decrease  
+---
+# Generalized least squares with maximum likelihood   
+Also consider correlation between observations (constant across individuals)   
+Maximum likelihood is faster that generalized estimating equations   
+Unstructured model: five or fewer time points  
+Exchangeable, autoregressive of order 1, toeplitz, exponential  
+---
+# Missing data  
+Response variable: GLS -> missing at random, GEE -> missing completely at random    
+
+---
+# Random-effects model (random intercepts model)    
+$y_{it} = \mu_{t} + \beta x_{it} + \gamma z_{i} + \alpha_{i} + \varepsilon_{it}$  
+$\alpha_{i}$ is normally distributed with a mean of 0, constant variance $\tau^2$ and is independent of $\varepsilon_{it}$, $x_{it}$, $z_{i}$.  
+$corr(\varepsilon_{it}, \varepsilon_{is}) = 0$ (no autocorrelation)  
+---
+# Compound symmetry structure  
+$cov(y_{it}, y_{is}|X, Z) = \tau^2$  
+$corr(y_{it}, y_{is}|X, Z) = \frac{\tau^2}{\tau^2+\sigma^2_{\varepsilon}}=\rho=ICC$  
+Random intercept model is the Same as GLS.  
+
+---
+# Limitations  
+- Over-time correlation structure that may not fit the data.  
+- $\alpha_i$ is uncorrelated with all other variables -> not controlling for unobserved variables  
+
+---
+# R packages  
+lme4: assume exchangeability  
+nlme package: relax the exchangeability assumption  
+
+# Random coefficients  
+$y_{it} = \mu_{t} + \beta_i x_{it} + \gamma z_{i} + \alpha_{i} + \varepsilon_{it}$  
+```
+fit <- nlme::lme(death ~ age + treatment + time,
+        ~treatment|id, data = df, method = "ML")
+```  
+.bg-light-blue.b--dark-blue.ba.bw2.br3.shadow-5.ph4.mt5[
+Random effects is interaction between known a treatment variable and unobserved variables.  
+If you want to add only random coefficient effects without random intercepts, add $-1+treatment|id$.
+]
+  
+---
+# Random grouwth curve models  
+A special case of random coefficient model  
+Time coded as 0, 1, 2....(linear)  and random slope  
+Extension to time-invariant predictors  
+Level 1: $y_{it}=\mu + \beta x_{it} + \gamma Z_i + \theta_{i} t + \alpha_i + \varepsilon_{it}$  
+Level 2: $\theta_i = \tau_0 + \tau_1 Z_i + \eta_i$
+Combine: $y_{it}=\mu + \beta x_{it} + \gamma Z_i + \tau_0 t + \tau_1 Z_i t + \eta_i t + \alpha_i + \varepsilon_{it}$
+---
+# Relaxation of the assumptions  
+
+Allow correlation of $\varepsilon_{it}$   
+Typically low-order autoregressive structure  
+No unstructured  
+```
+fit.relax <- nlme::lme(death ~ age + treatment + time,
+        ~1|id, data = df,
+        corr = corAR1(), method = "ML")
+```  
+---
+# Fixed effects models  
+$y_{it} = \mu_{t} + \beta x_{it} + \gamma z_{i} + \alpha_{i} + \varepsilon_{it}$  
+$\alpha_{i}$ is a set of fixed constants (one for each individual).  
+Allow $\alpha_{i}$ to be correlated with $x$ and $z$  
+Cannot estimate time-invariant predictors $z_i$  
+$\alpha_{i}$ is perfectly collinear with $z_i$  
+Between variation goes away! (Standard errors may be higher)   
+---
+# Between-within method  
+Decomposition each time-varying predictor into within and between (also categorical variables)  
+Fixed effects -> time-varying predictors  
+Random-effects -> time-invariant predictors  
+
+---
+# R code  
+Long format is better.  
+Decomposition of time-varying predictors  
+```
+df_long %>% 
+  group_by(id) %>% 
+  mutate(mage = mean(age),
+         mics = mean(ics)) %>% # between
+  ungroup() %>% 
+  mutate(dage = age - mage,
+         dics = ics - mics) # with-in  
+         # ics: inhaled corticosteroid
+```
+---
+# R code  
+Coefficients of d(time-varying predictors) -> identical to a fixed effects model  
+Coefficients of time-invariant predictors -> not identical to a fixed effects model   
+
+```
+fit_wb <- lmer(outcome ~ dage + dics + mage + mics + time + (1|id),
+          data = df_long,
+          REML = FALSE)
+```
+---
+# R code  
+Can test the model-fit separately and jointly  
+
+```
+car::linearHypothesis(fit_wb, "dage = mage")
+car::linearHypothesis(fit_wb, "dics = mics")
+car::linearHypothesis(fit_wb, c("dage = mage","dics = mics"))
+```
+---
+# Brush up  
+Add random slopes to "within" any time-varying variables  
+Cannot add random slopes to "between" any time-varying variables  
+Do not add random slopes to time-invariant variables  
+
+---
+# Summary  
+Aims:  
+1. Effects of time-varying predictors -> fixed effects model (within)  
+However, between-within method is preferred when "more than two levels", "want random coefficients", "not assume exchangeability". 
+2. Effects of time-invariant predictors -> random-effects model (between)  
+
+Do not add a lagged dependent variables !  
+---
+# Categorical respose variables  
+
+STATA may be preferable !
+lme::glmer  
+options:  
+- nAGO: number of adaptive quadrature points for estimation  
+- control: choosing an optimizer, number of interations, etc  
+Coefficients (subject-specific coefficients) are usually larger than GEE (population-averaged coefficients).  
+```
+fit_glm <- glmer(death ~ age + ics + time + (1|id),
+            family = binomial,
+            nAGQ = 7, # STATA default (default is 1 and not accurate Laplace approximation)
+            control = glmerControl(optimizer = c("bobyqa", "bodyqa")), # for RE -> RE + FEX (Default is Nelder-Mead)
+            data = df)
+sjstats::icc(melogit)
+```
+  
+Conversion: $\beta_{PA} \approx \frac{\beta_{SS}}{\sqrt{1+0.346\tau^2}}$  
+
+---
+# Fixed effcts model  
+Incidental parameters problem  
+Fixed effects model of individuals -> Based away from 0
+Conditional likelihood: conditions on the number of 1's and 0's for each person    
+Omit time-invariant variables  
+"Why failure occurred in some times but not in other times?"  
+Can add time-variant and time-invariant interactions  
+```
+survival::clogit(failure ~ age + tr + time + strata(id), data = df)
+```
+
+
+
+
+
+
+
+
+
+
+

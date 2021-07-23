@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Mixed effects model</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Ichinomiyanishi Hospital" />
+    <meta name="author" content="Akihiro Shiroshita" />
+    <meta name="date" content="2021-07-22" />
+    <script src="libs/header-attrs/header-attrs.js"></script>
+    <link href="libs/tile-view/tile-view.css" rel="stylesheet" />
+    <script src="libs/tile-view/tile-view.js"></script>
+    <link href="libs/panelset/panelset.css" rel="stylesheet" />
+    <script src="libs/panelset/panelset.js"></script>
+    <link href="libs/xaringanExtra-extra-styles/xaringanExtra-extra-styles.css" rel="stylesheet" />
+    <link href="libs/tachyons/tachyons.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Mixed effects model
+### Ichinomiyanishi Hospital
+### Akihiro Shiroshita
+### 2021-07-22
+
+---
+
+
+
+
+
+
+
+# General set-up  
+
+```r
+library(tidyverse)
+library(ggplot2)
+library(clubSandwich)
+library(nlme)
+library(lme4)
+library(plm)
+library(lavaan)
+library(broom)
+library(broom.mixed)
+library(ggeffects)
+```
+
+---
+class: center, middle
+
+# Multilevel modeling     
+
+---
+# Why multilevel modelsing?  
+1. Cluster  
+2. Repeated observations  
+Key point: The difference is exchangeability.  
+
+---
+# Variance  
+Without considering covariates    
+
+`$$\frac{1}{N-1}\sum^N_{i=1}(y_i-\bar{y})^2$$`  
+
+# Residual variance  
+With considering covariates    
+`$$\frac{1}{N-1}\sum^N_{i=1}(y_i-\hat{y_i})^2$$`  
+`$$\hat{y_i}=E(Y|X=x)$$`  
+
+---
+# `\(R^2\)`   
+`$$R^2=1-\frac{\sum(y_i-\hat{y_i})^2}{\sum(y_i-\bar{y})}$$`
+
+---
+.pull-left[
+
+###1. Cluster  
+&lt;img src="Mixed_effects_model_files/figure-html/unnamed-chunk-2-1.svg" width="80%" style="display: block; margin: auto;" /&gt;
+Different hospital, different patients.  ]
+
+.pull-right[
+###2. Longitudinal data 
+&lt;img src="Mixed_effects_model_files/figure-html/unnamed-chunk-3-1.svg" width="80%" style="display: block; margin: auto;" /&gt;
+
+
+Different people, different growth curve.  
+]  
+
+--
+
+.footnote[Distinguishing *within* and *between* variability !]
+
+---
+# Intraclass correlation  
+$$ICC = \frac{\text{Between-group variance}}{\text{Total variance}} $$  
+$$\rho = \frac{\tau^2}{\tau^2+\sigma^2} $$  
+---
+# How to pool the data
+- No pooling: Fixed effect model    
+- Partial pooling: combine cluster-specific data (Random effect model)     
+$$ \hat{\mu}_j^{PP} = \hat{R}_j(\hat{\mu}_j^{ML} - \bar{\mu}) + \bar{\mu} $$  
+$$ \hat{R}_j = \frac{\tau^2}{\tau^2 + \sigma^2 / n_j} $$  
+- Complete pooling  
+
+---
+# Summary   
+#### No pooling
+
+`\(y_{ij} = \mu + \alpha_{j} + \varepsilon_{ij}\)`
+
+`\(\varepsilon_{ij} \sim N(0,\sigma^2)\)`
+
+--
+
+#### Partial pooling
+
+`\(y_{ij} = \alpha_{j} + \varepsilon_{ij}\)`
+
+`\(\alpha_j \sim N(\mu,\tau^2)\)`
+
+`\(\varepsilon_{ij} \sim N(0,\sigma^2)\)`
+
+---
+
+#### Complete pooling
+
+`\(y_{ij} = \alpha_{j} + \varepsilon_{ij}\)`
+
+`\(\alpha_j \sim N(\mu,0) \qquad\)` [assumes `\(\alpha_j\)` does not vary]
+
+`\(\varepsilon_{ij} \sim N(0,\sigma^2)\)`  
+
+--
+#### Partially pooled intercepts and slopes  
+
+`\(y_{ij} = \beta_0 + u_{0j} +(\beta_{1} + u_{1j} ) x_{ij} + \varepsilon_{ij}\)`
+
+`\(u_{0j} \sim N(0,\tau_0^2)\)`
+
+`\(u_{1j} \sim N(0,\tau_1^2)\)`
+
+`\(\tau_{01} = \text{cov}(u_{0j},u_{1j}) \quad\)`   [covariance between random components]
+
+`\(\varepsilon_{ij} \sim N(0,\sigma^2)\)`
+
+---
+# Multivariate models  
+
+level 1 or level 2  or both?  
+
+#### Within or Level 1  
+`\(R_{(W)}^2 = \frac{\sigma_0^2-\sigma_1^2}{\sigma_0^2}\)`   
+#### Between or Level 2  
+`\(R_{(B)}^2 = \frac{\tau_0^2-\tau_1^2}{\tau_0^2}\)`
+#### Total  
+`\(R_{(T)}^2 = \frac{(\tau_0^2 +\sigma_0^2) - (\tau_1^2 +\sigma_1^2)}{\tau_0^2 +\sigma_0^2}\)`  
+
+---
+# Standardization  
+In general, 0-1 standardization instead of z-score standardization may be better.  
+
+---
+# Assumption  
+`\(y_{ij} = \mu + \beta x_{ij} + \alpha_j + \varepsilon_{ij}\)`
+
+These models partition the total error into group- and individual-level components. But the same assumptions apply: that `\(x_{ij}\)` is independent of `\(\alpha_j\)` and `\(\varepsilon_{ij}\)`.  
+It requires the assumption that the within and between variance have the *same effects* on the outcome.  
+---
+### Between-within model vs within (fixed)-effects model  
+A within-effects model discards all between-group variance.  
+It does not work well in panel data analysis.  
+If we do not care about level-2 effects, a within model is the more conservative.  
+
+---
+# Longitudinal data analysis  
+Not exchangeable  
+- Robust standard errors  
+- Generalized least squares  
+- Generalized estimating equations  
+- Random-effects models  
+- Fixed-effects models  
+---
+# Ordinal least squares   
+`\(y_{it} = \mu_{t} + \beta x_{it} + + \gamma z_{i} + \varepsilon_{it}\)`  
+`\(\varepsilon\)` is uncorrelated with x and z.  
+---
+# Robust standard error  
+OLS has no correction for dependence  
+Nothing to do with coefficients  
+Generally increase in the standard errors for time-invariant variables  
+Standard errors for time often decrease  
+---
+# Generalized least squares with maximum likelihood   
+Also consider correlation between observations (constant across individuals)   
+Maximum likelihood is faster that generalized estimating equations   
+Unstructured model: five or fewer time points  
+Exchangeable, autoregressive of order 1, toeplitz, exponential  
+---
+# Missing data  
+Response variable: GLS -&gt; missing at random, GEE -&gt; missing completely at random    
+
+---
+# Random-effects model (random intercepts model)    
+`\(y_{it} = \mu_{t} + \beta x_{it} + \gamma z_{i} + \alpha_{i} + \varepsilon_{it}\)`  
+`\(\alpha_{i}\)` is normally distributed with a mean of 0, constant variance `\(\tau^2\)` and is independent of `\(\varepsilon_{it}\)`, `\(x_{it}\)`, `\(z_{i}\)`.  
+`\(corr(\varepsilon_{it}, \varepsilon_{is}) = 0\)` (no autocorrelation)  
+---
+# Compound symmetry structure  
+`\(cov(y_{it}, y_{is}|X, Z) = \tau^2\)`  
+`\(corr(y_{it}, y_{is}|X, Z) = \frac{\tau^2}{\tau^2+\sigma^2_{\varepsilon}}=\rho=ICC\)`  
+Random intercept model is the Same as GLS.  
+
+---
+# Limitations  
+- Over-time correlation structure that may not fit the data.  
+- `\(\alpha_i\)` is uncorrelated with all other variables -&gt; not controlling for unobserved variables  
+
+---
+# R packages  
+lme4: assume exchangeability  
+nlme package: relax the exchangeability assumption  
+
+# Random coefficients  
+`\(y_{it} = \mu_{t} + \beta_i x_{it} + \gamma z_{i} + \alpha_{i} + \varepsilon_{it}\)`  
+```
+fit &lt;- nlme::lme(death ~ age + treatment + time,
+        ~treatment|id, data = df, method = "ML")
+```  
+.bg-light-blue.b--dark-blue.ba.bw2.br3.shadow-5.ph4.mt5[
+Random effects is interaction between known a treatment variable and unobserved variables.  
+If you want to add only random coefficient effects without random intercepts, add `\(-1+treatment|id\)`.
+]
+  
+---
+# Random grouwth curve models  
+A special case of random coefficient model  
+Time coded as 0, 1, 2....(linear)  and random slope  
+Extension to time-invariant predictors  
+Level 1: `\(y_{it}=\mu + \beta x_{it} + \gamma Z_i + \theta_{i} t + \alpha_i + \varepsilon_{it}\)`  
+Level 2: `\(\theta_i = \tau_0 + \tau_1 Z_i + \eta_i\)`
+Combine: `\(y_{it}=\mu + \beta x_{it} + \gamma Z_i + \tau_0 t + \tau_1 Z_i t + \eta_i t + \alpha_i + \varepsilon_{it}\)`
+---
+# Relaxation of the assumptions  
+
+Allow correlation of `\(\varepsilon_{it}\)`   
+Typically low-order autoregressive structure  
+No unstructured  
+```
+fit.relax &lt;- nlme::lme(death ~ age + treatment + time,
+        ~1|id, data = df,
+        corr = corAR1(), method = "ML")
+```  
+---
+# Fixed effects models  
+`\(y_{it} = \mu_{t} + \beta x_{it} + \gamma z_{i} + \alpha_{i} + \varepsilon_{it}\)`  
+`\(\alpha_{i}\)` is a set of fixed constants (one for each individual).  
+Allow `\(\alpha_{i}\)` to be correlated with `\(x\)` and `\(z\)`  
+Cannot estimate time-invariant predictors `\(z_i\)`  
+`\(\alpha_{i}\)` is perfectly collinear with `\(z_i\)`  
+Between variation goes away! (Standard errors may be higher)   
+---
+# Between-within method  
+Decomposition each time-varying predictor into within and between (also categorical variables)  
+Fixed effects -&gt; time-varying predictors  
+Random-effects -&gt; time-invariant predictors  
+
+---
+# R code  
+Long format is better.  
+Decomposition of time-varying predictors  
+```
+df_long %&gt;% 
+  group_by(id) %&gt;% 
+  mutate(mage = mean(age),
+         mics = mean(ics)) %&gt;% # between
+  ungroup() %&gt;% 
+  mutate(dage = age - mage,
+         dics = ics - mics) # with-in  
+         # ics: inhaled corticosteroid
+```
+---
+# R code  
+Coefficients of d(time-varying predictors) -&gt; identical to a fixed effects model  
+Coefficients of time-invariant predictors -&gt; not identical to a fixed effects model   
+
+```
+fit_wb &lt;- lmer(outcome ~ dage + dics + mage + mics + time + (1|id),
+          data = df_long,
+          REML = FALSE)
+```
+---
+# R code  
+Can test the model-fit separately and jointly  
+
+```
+car::linearHypothesis(fit_wb, "dage = mage")
+car::linearHypothesis(fit_wb, "dics = mics")
+car::linearHypothesis(fit_wb, c("dage = mage","dics = mics"))
+```
+---
+# Brush up  
+Add random slopes to "within" any time-varying variables  
+Cannot add random slopes to "between" any time-varying variables  
+Do not add random slopes to time-invariant variables  
+
+---
+# Summary  
+Aims:  
+1. Effects of time-varying predictors -&gt; fixed effects model (within)  
+However, between-within method is preferred when "more than two levels", "want random coefficients", "not assume exchangeability". 
+2. Effects of time-invariant predictors -&gt; random-effects model (between)  
+
+Do not add a lagged dependent variables !  
+---
+# Categorical respose variables  
+
+STATA may be preferable !
+lme::glmer  
+options:  
+- nAGO: number of adaptive quadrature points for estimation  
+- control: choosing an optimizer, number of interations, etc  
+Coefficients (subject-specific coefficients) are usually larger than GEE (population-averaged coefficients).  
+```
+fit_glm &lt;- glmer(death ~ age + ics + time + (1|id),
+            family = binomial,
+            nAGQ = 7, # STATA default (default is 1 and not accurate Laplace approximation)
+            control = glmerControl(optimizer = c("bobyqa", "bodyqa")), # for RE -&gt; RE + FEX (Default is Nelder-Mead)
+            data = df)
+sjstats::icc(melogit)
+```
+  
+Conversion: `\(\beta_{PA} \approx \frac{\beta_{SS}}{\sqrt{1+0.346\tau^2}}\)`  
+
+---
+# Fixed effcts model  
+Incidental parameters problem  
+Fixed effects model of individuals -&gt; Based away from 0
+Conditional likelihood: conditions on the number of 1's and 0's for each person    
+Omit time-invariant variables  
+"Why failure occurred in some times but not in other times?"  
+Can add time-variant and time-invariant interactions  
+```
+survival::clogit(failure ~ age + tr + time + strata(id), data = df)
+```
+
+
+
+
+
+
+
+
+
+
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
