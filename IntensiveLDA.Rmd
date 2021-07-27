@@ -1,0 +1,314 @@
+---
+title: "Intensive LDA"  
+author: 
+  - "Ichinomiyanishi Hospital"
+  - "Akihiro Shiroshita"
+date: '`r Sys.Date()`'
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    css: xaringan-themer.css
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	fig.align = "center",
+	fig.asp = 0.618,
+	fig.retina = 3,
+	fig.width = 6,
+	message = FALSE,
+	warning = FALSE,
+	dev = "svg",
+	include = FALSE,
+	out.width = "80%"
+)
+options(htmltools.dir.version = FALSE)
+```
+
+```{r xaringan-themer, include=FALSE, warning=FALSE}
+library(xaringanthemer)
+style_duo_accent(
+  primary_color = "#1381B0",
+  secondary_color = "#FF961C",
+  inverse_header_color = "#FFFFFF"
+)
+```
+```{r xaringan-extra, include=FALSE, warning=FALSE}
+xaringanExtra::use_tile_view() # press "O" button
+xaringanExtra::use_panelset()
+xaringanExtra::use_extra_styles(
+  hover_code_line = TRUE,         #<<
+  mute_unhighlighted_code = TRUE  #<<
+)
+
+xaringanExtra::use_tachyons()
+```
+
+---
+class: center, middle
+
+# Intensive LDA      
+
+---
+# Opioids and Happiness  
+
+- Random prompts
+- Rescue opioids episodes  
+
+Outcomes: positive mood and negative mood  
+
+---
+# What is "mean"?    
+$y_{ij} = \beta_0 + v_i + \varepsilon_{ij}$  
+
+```
+PROC MIXED COVTEST;
+CLASS id;
+MODEL NegAff = / SoLUTION;
+RANDOM INTERCEPT / SUBJECT=id;
+
+```
+*NegAff = negative affect  
+
+---
+# Does opioids have positive effect?    
+
+$y_{ij} = \beta_0 + \beta_1 Opioinds + v_i + \varepsilon_{ij}$   
+
+$y_{ij} = \beta_0 + \beta_1 Opioinds + Sex + Alone +  v_i + \varepsilon_{ij}$ 
+
+*Alone: time-varying  
+
+---
+## Within subject and Between subject effects  
+
+Time-varying covaiates  
+
+Within-subjects model: $y_{ij} = b_{0i} + b_{1i}X_{ij} + E_{ij}$   
+
+Between-subjects model: $b_{0i} = \beta_0 + v_{oi}$, $b_{1i} = \beta_1$   
+
+- Within: within subjects    
+- Between: Subject average of x -> Subject average of x
+
+No decomposition = Assumes same effects (BW = WS)   
+
+---
+# Decomposition  
+
+Within-subjects model: $y_{ij} = b_{0i} + b_{1i}(X_{ij}-\bar{X_i}) + E_{ij}$   
+
+Between-subjects model: $b_{0i} = \beta_0 + \beta_{BS} \bar{X_i} + v_{oi}$, $b_{1i} = \beta_{WS}$  
+
+The effect of X is $\beta_{BS}\bar{X_i} + \beta_{WS}(X_{ij}-\bar{X_i})$
+
+---
+# Clinical questions 
+
+- Is the mood before opioid use worse than usual?  
+
+- Is it that patients who use opioids more have worse mood?   
+
+---
+## Add day of weeek and time of day  
+
+Day of week
+- Weekday/Weekend  
+- Six indicators  
+Time of day  
+- Do not: Treating time as a linear predictor  
+- Creating time bin  
+
+---
+# Cautions about centering  
+
+Age may be centored based on the lower limit.  
+Binary variables may not be centored.  
+
+---
+# Multivariate multilevel model  
+
+Multiple outcomes jointly  
+Correlation of multiple outcomes at subject and observation level  
+More efficient tests of outcomes  
+A single test for covariate effect on multiple outcomes  
+test whether covariates have the same or varying effect on multiple outcomes  
+Extended to more that 2 outcomes
+
+---
+# Bivariate random intercept model (same effects on outcomes)  
+$v_i$: cluster-level  
+$\varepsilon_{ij}$: subject-level 
+$$\begin{bmatrix}y_{(1)ij} \\
+y_{(0)ij}
+\end{bmatrix}=
+\begin{bmatrix}1 & 0 & X_{ij} \\
+0 & 1 & X_{ij}
+\end{bmatrix}
+\begin{bmatrix}\beta_{(1)0} \\
+\beta_{(2)0} \\
+\beta_{1}
+\end{bmatrix}+
+\begin{bmatrix}1 & 0 \\
+0 & 1
+\end{bmatrix}
+\begin{bmatrix}v_{(1)i} \\
+v_{(2)i}
+\end{bmatrix}+
+\begin{bmatrix}\varepsilon_{(1)ij} \\
+\varepsilon_{(2)ij}
+\end{bmatrix}$$
+
+---
+# Bivariate random intercept model  
+Varying effect of X  
+You can test the difference of effects 
+$$\begin{bmatrix}y_{(1)ij} \\
+y_{(0)ij}
+\end{bmatrix}=
+\begin{bmatrix}1 & 0 & X_{ij} & 0 \\
+0 & 1 & 0 & X_{ij}
+\end{bmatrix}
+\begin{bmatrix}\beta_{(1)0} \\
+\beta_{(2)0} \\
+\beta_{(1)1}\\
+\beta_{(2)1}
+\end{bmatrix}+
+\begin{bmatrix}1 & 0 \\
+0 & 1
+\end{bmatrix}
+\begin{bmatrix}v_{(1)i} \\
+v_{(2)i}
+\end{bmatrix}+
+\begin{bmatrix}\varepsilon_{(1)ij} \\
+\varepsilon_{(2)ij}
+\end{bmatrix}$$
+
+---
+# Bivariate model with different covariate effects    
+Do not ignore *within* and *between* !  
+By default, no correlation between two random effects  
+Change to "unstructured"  
+
+---
+# Example  
+* No covariates
+```
+mixed outcome neg_mood anxiety, nocon ///
+  || id: neg_mood anxiety, nocon covariance(unstructured) stddeviations ///
+  || obsid:, nocon residuals(un, t(varind))
+```
+* Add covariates (same effects)
+```
+mixed outcome neg_mood anxiety opioid_BS opioids_WS, nocon ///
+  || id: neg_mood anxiety, nocon covariance(unstructured) stddeviations ///
+  || obsid:, nocon residuals(un, t(varind))
+```
+*t(varind): different residual variance of each varind  
+
+---
+# Example  
+* Add covariates (different effects)
+```
+mixed outcome neg_mood anxiety opioids_BS opioids_WS ///
+  c.anxiety#c.opioids_BS c.anxiety#c.opioids_WS, nocon ///
+  || id: neg_mood anxiety, nocon covariance(unstructured) stddeviations ///
+  || obsid:, nocon residuals(un, t(varind))
+  lincom opioids_BS + c.anxiety#c.opioids_BS
+  lincom opioids_WS + c.anxiety#c.opioids_WS
+```
+
+---
+# Heterogenous mixed-effects models  
+
+$y_{ij} = (\beta_{0i} + v_{0i}) + (\beta_{1}+v_{1i})X_{ij} + \varepsilon_{ij}$  
+population and subject-level 
+Separation into WS and BS  
+$y_{ij} = (\beta_{0i} + v_{0i}) + (\beta_{1}+v_{1i})X_{ij} + \beta_2 \overline{X_i} +  \varepsilon_{ij}$  
+
+
+---
+# Rescaling the variance parameters  
+* Intercept variance  
+$\sigma^2_{v0} = exp(\alpha_{00})$  
+Mood variation during random prompts  
+* X variance (within)  
+$\sigma^2_{v1} = exp(\alpha_{10})$  
+Mood change associated with opioids use compared to non-opioids  
+
+---
+# Heterogenous mixed model for modeling mood variation associated with opioid use  
+$y_{ij} = (\beta_{0i} + v_{0i}) + (\beta_{1}+v_{1i})X_{ij} + \beta_2 X_i + \beta_3 w_i + \beta_4 (w_i \times X_{ij}) + \varepsilon_{ij}$  
+
+Subject variances vary by subject variable  
+
+$\sigma^2_{v0} = exp(\alpha_{00}+\alpha_{00} w_i)$  
+$\sigma^2_{v1} = exp(\alpha_{10}+\alpha_{11} w_i)$  
+
+Cannot do via STATA  
+What we want is heterogeneity (slope variance) of the change in mood associated with $w_i$  
+For example, variation in opioid-related mood response is decreased for more frequent opioid users, relative to less frequent opioid users
+
+---
+# Difference    
+- Between effect  
+- Interaction  
+- Random intercept 
+- Random slope
+
+---
+# Mixed-effects location scale (MELS) model  
+Location: mean  
+Scale: variance  
+- Previous models
+$y_{ij} = x'_{ij} \beta + v_i + \varepsilon_{ij}$  
+$v_i$: BS -> homogeneous/heterogeneous  
+$\varepsilon_{ij}$: WS -> consistent/erratic  
+---
+# Variances  
+BS variance: $\sigma^2_{vij} = exp(u'_{ij} \alpha)$ or $log(\sigma^2_{vij}) = u'_{ij} \alpha$  
+
+WS variance: $\sigma^2_{\varepsilon_{ij}} = exp(w'_{ij} \tau)$or $log(\sigma^2_{\varepsilon_{ij}}) = w'_{ij} \tau$
+
+---
+# MELS model  
+
+WS variance: $\sigma^2_{\varepsilon_{ij}} = exp(w'_{ij} \tau + w_i)$  
+
+$w_i \sim N(0,\sigma^2_w)$
+
+$log(\sigma^2_{\varepsilon_{ij}}) = w'_{ij} \tau + w_i$  
+
+scale random effects and location random effects  
+---
+# Scale  
+Standard deviation: dispersion of random scale effect (variance of variance).   
+Covariance: Association between the mean and the within subject variance. If covariance is plus and "value" is higher than "mean", more erratic.  
+
+$\sigma^2_{BS}=exp(\tau_0 + \tau_1X_i+\tau_2X_{ij})$
+
+exp $\tau_j$ = variance ratio of $\sigma^2_{BS}$ for a unit change in $x_j$  
+
+exp $\alpha_j$ = variance ratio of $\sigma^2_{WS}$ for a unit change in $x_j$  
+
+---
+# MixWILD  
+
+https://voices.uchicago.edu/hedeker/  
+
+- Mixed-effects location scale model (MIXREGLS)  
+Random intercept  
+
+- Mixed-effects multiple location scale model (MIXREGMLS)  
+Random slope + intercept  
+
+---
+# 
+
+
+
+

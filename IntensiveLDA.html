@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Intensive LDA</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Ichinomiyanishi Hospital" />
+    <meta name="author" content="Akihiro Shiroshita" />
+    <meta name="date" content="2021-07-25" />
+    <script src="libs/header-attrs/header-attrs.js"></script>
+    <link href="libs/tile-view/tile-view.css" rel="stylesheet" />
+    <script src="libs/tile-view/tile-view.js"></script>
+    <link href="libs/panelset/panelset.css" rel="stylesheet" />
+    <script src="libs/panelset/panelset.js"></script>
+    <link href="libs/xaringanExtra-extra-styles/xaringanExtra-extra-styles.css" rel="stylesheet" />
+    <link href="libs/tachyons/tachyons.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Intensive LDA
+### Ichinomiyanishi Hospital
+### Akihiro Shiroshita
+### 2021-07-25
+
+---
+
+
+
+
+
+
+
+---
+class: center, middle
+
+# Intensive LDA      
+
+---
+# Opioids and Happiness  
+
+- Random prompts
+- Rescue opioids episodes  
+
+Outcomes: positive mood and negative mood  
+
+---
+# What is "mean"?    
+`\(y_{ij} = \beta_0 + v_i + \varepsilon_{ij}\)`  
+
+```
+PROC MIXED COVTEST;
+CLASS id;
+MODEL NegAff = / SoLUTION;
+RANDOM INTERCEPT / SUBJECT=id;
+
+```
+*NegAff = negative affect  
+
+---
+# Does opioids have positive effect?    
+
+`\(y_{ij} = \beta_0 + \beta_1 Opioinds + v_i + \varepsilon_{ij}\)`   
+
+`\(y_{ij} = \beta_0 + \beta_1 Opioinds + Sex + Alone +  v_i + \varepsilon_{ij}\)` 
+
+*Alone: time-varying  
+
+---
+## Within subject and Between subject effects  
+
+Time-varying covaiates  
+
+Within-subjects model: `\(y_{ij} = b_{0i} + b_{1i}X_{ij} + E_{ij}\)`   
+
+Between-subjects model: `\(b_{0i} = \beta_0 + v_{oi}\)`, `\(b_{1i} = \beta_1\)`   
+
+- Within: within subjects    
+- Between: Subject average of x -&gt; Subject average of x
+
+No decomposition = Assumes same effects (BW = WS)   
+
+---
+# Decomposition  
+
+Within-subjects model: `\(y_{ij} = b_{0i} + b_{1i}(X_{ij}-\bar{X_i}) + E_{ij}\)`   
+
+Between-subjects model: `\(b_{0i} = \beta_0 + \beta_{BS} \bar{X_i} + v_{oi}\)`, `\(b_{1i} = \beta_{WS}\)`  
+
+The effect of X is `\(\beta_{BS}\bar{X_i} + \beta_{WS}(X_{ij}-\bar{X_i})\)`
+
+---
+# Clinical questions 
+
+- Is the mood before opioid use worse than usual?  
+
+- Is it that patients who use opioids more have worse mood?   
+
+---
+## Add day of weeek and time of day  
+
+Day of week
+- Weekday/Weekend  
+- Six indicators  
+Time of day  
+- Do not: Treating time as a linear predictor  
+- Creating time bin  
+
+---
+# Cautions about centering  
+
+Age may be centored based on the lower limit.  
+Binary variables may not be centored.  
+
+---
+# Multivariate multilevel model  
+
+Multiple outcomes jointly  
+Correlation of multiple outcomes at subject and observation level  
+More efficient tests of outcomes  
+A single test for covariate effect on multiple outcomes  
+test whether covariates have the same or varying effect on multiple outcomes  
+Extended to more that 2 outcomes
+
+---
+# Bivariate random intercept model (same effects on outcomes)  
+`\(v_i\)`: cluster-level  
+`\(\varepsilon_{ij}\)`: subject-level 
+`$$\begin{bmatrix}y_{(1)ij} \\
+y_{(0)ij}
+\end{bmatrix}=
+\begin{bmatrix}1 &amp; 0 &amp; X_{ij} \\
+0 &amp; 1 &amp; X_{ij}
+\end{bmatrix}
+\begin{bmatrix}\beta_{(1)0} \\
+\beta_{(2)0} \\
+\beta_{1}
+\end{bmatrix}+
+\begin{bmatrix}1 &amp; 0 \\
+0 &amp; 1
+\end{bmatrix}
+\begin{bmatrix}v_{(1)i} \\
+v_{(2)i}
+\end{bmatrix}+
+\begin{bmatrix}\varepsilon_{(1)ij} \\
+\varepsilon_{(2)ij}
+\end{bmatrix}$$`
+
+---
+# Bivariate random intercept model  
+Varying effect of X  
+You can test the difference of effects 
+`$$\begin{bmatrix}y_{(1)ij} \\
+y_{(0)ij}
+\end{bmatrix}=
+\begin{bmatrix}1 &amp; 0 &amp; X_{ij} &amp; 0 \\
+0 &amp; 1 &amp; 0 &amp; X_{ij}
+\end{bmatrix}
+\begin{bmatrix}\beta_{(1)0} \\
+\beta_{(2)0} \\
+\beta_{(1)1}\\
+\beta_{(2)1}
+\end{bmatrix}+
+\begin{bmatrix}1 &amp; 0 \\
+0 &amp; 1
+\end{bmatrix}
+\begin{bmatrix}v_{(1)i} \\
+v_{(2)i}
+\end{bmatrix}+
+\begin{bmatrix}\varepsilon_{(1)ij} \\
+\varepsilon_{(2)ij}
+\end{bmatrix}$$`
+
+---
+# Bivariate model with different covariate effects    
+Do not ignore *within* and *between* !  
+By default, no correlation between two random effects  
+Change to "unstructured"  
+
+---
+# Example  
+* No covariates
+```
+mixed outcome neg_mood anxiety, nocon ///
+  || id: neg_mood anxiety, nocon covariance(unstructured) stddeviations ///
+  || obsid:, nocon residuals(un, t(varind))
+```
+* Add covariates (same effects)
+```
+mixed outcome neg_mood anxiety opioid_BS opioids_WS, nocon ///
+  || id: neg_mood anxiety, nocon covariance(unstructured) stddeviations ///
+  || obsid:, nocon residuals(un, t(varind))
+```
+*t(varind): different residual variance of each varind  
+
+---
+# Example  
+* Add covariates (different effects)
+```
+mixed outcome neg_mood anxiety opioids_BS opioids_WS ///
+  c.anxiety#c.opioids_BS c.anxiety#c.opioids_WS, nocon ///
+  || id: neg_mood anxiety, nocon covariance(unstructured) stddeviations ///
+  || obsid:, nocon residuals(un, t(varind))
+  lincom opioids_BS + c.anxiety#c.opioids_BS
+  lincom opioids_WS + c.anxiety#c.opioids_WS
+```
+
+---
+# Heterogenous mixed-effects models  
+
+`\(y_{ij} = (\beta_{0i} + v_{0i}) + (\beta_{1}+v_{1i})X_{ij} + \varepsilon_{ij}\)`  
+population and subject-level 
+Separation into WS and BS  
+`\(y_{ij} = (\beta_{0i} + v_{0i}) + (\beta_{1}+v_{1i})X_{ij} + \beta_2 \overline{X_i} +  \varepsilon_{ij}\)`  
+
+
+---
+# Rescaling the variance parameters  
+* Intercept variance  
+`\(\sigma^2_{v0} = exp(\alpha_{00})\)`  
+Mood variation during random prompts  
+* X variance (within)  
+`\(\sigma^2_{v1} = exp(\alpha_{10})\)`  
+Mood change associated with opioids use compared to non-opioids  
+
+---
+# Heterogenous mixed model for modeling mood variation associated with opioid use  
+`\(y_{ij} = (\beta_{0i} + v_{0i}) + (\beta_{1}+v_{1i})X_{ij} + \beta_2 X_i + \beta_3 w_i + \beta_4 (w_i \times X_{ij}) + \varepsilon_{ij}\)`  
+
+Subject variances vary by subject variable  
+
+`\(\sigma^2_{v0} = exp(\alpha_{00}+\alpha_{00} w_i)\)`  
+`\(\sigma^2_{v1} = exp(\alpha_{10}+\alpha_{11} w_i)\)`  
+
+Cannot do via STATA  
+What we want is heterogeneity (slope variance) of the change in mood associated with `\(w_i\)`  
+For example, variation in opioid-related mood response is decreased for more frequent opioid users, relative to less frequent opioid users
+
+---
+# Difference    
+- Between effect  
+- Interaction  
+- Random intercept 
+- Random slope
+
+---
+# Mixed-effects location scale (MELS) model  
+Location: mean  
+Scale: variance  
+- Previous models
+`\(y_{ij} = x'_{ij} \beta + v_i + \varepsilon_{ij}\)`  
+`\(v_i\)`: BS -&gt; homogeneous/heterogeneous  
+`\(\varepsilon_{ij}\)`: WS -&gt; consistent/erratic  
+---
+# Variances  
+BS variance: `\(\sigma^2_{vij} = exp(u'_{ij} \alpha)\)` or `\(log(\sigma^2_{vij}) = u'_{ij} \alpha\)`  
+
+WS variance: `\(\sigma^2_{\varepsilon_{ij}} = exp(w'_{ij} \tau)\)`or `\(log(\sigma^2_{\varepsilon_{ij}}) = w'_{ij} \tau\)`
+
+---
+# MELS model  
+
+WS variance: `\(\sigma^2_{\varepsilon_{ij}} = exp(w'_{ij} \tau + w_i)\)`  
+
+`\(w_i \sim N(0,\sigma^2_w)\)`
+
+`\(log(\sigma^2_{\varepsilon_{ij}}) = w'_{ij} \tau + w_i\)`  
+
+scale random effects and location random effects  
+---
+# Scale  
+Standard deviation: degree of Variation of scale in each subject  
+Covaiance: Association between "value" and "mean", and variation. If covariace is plus and "value" is higher than "mean", more erratic.  
+
+`\(\sigma^2_{BS}=exp(\tau_0 + \tau_1X_i+\tau_2X_{ij})\)`
+
+exp `\(\tau_j\)` = variance ratio of `\(\sigma^2_{BS}\)` for a unit change in `\(x_j\)`  
+
+exp `\(\alpha_j\)` = variance ratio of `\(\sigma^2_{WS}\)` for a unit change in `\(x_j\)`  
+
+---
+# MixWILD  
+
+https://voices.uchicago.edu/hedeker/  
+
+- Mixed-effects location scale model (MIXREGLS)  
+Random intercept  
+
+- Mixed-effects multiple location scale model (MIXREGMLS)  
+Random slope + intercept  
+
+
+
+
+
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
